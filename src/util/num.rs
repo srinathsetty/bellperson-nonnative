@@ -99,6 +99,32 @@ impl<Scalar: PrimeField> Num<Scalar> {
         Ok(())
     }
 
+    /// Computes the natural number represented by an array of bits.
+    /// Checks if the natural number equals `self`
+    pub fn is_equal<CS: ConstraintSystem<Scalar>>(
+        &self,
+        mut cs: CS,
+        other: &Bitvector<Scalar>,
+    ) -> Result<(), SynthesisError> {
+        let allocations = other.allocations.clone();
+
+        let mut f = Scalar::one();
+        let sum_of_tail_bits = allocations
+            .iter()
+            .fold(LinearCombination::zero(), |lc, bit| {
+                f = f.double();
+                lc + (f, &bit.bit)
+            });
+        let bit0_lc = LinearCombination::zero() + &self.num - &sum_of_tail_bits;
+        cs.enforce(
+            || "sum",
+            |lc| lc + &bit0_lc,
+            |lc| lc + CS::one() - &bit0_lc,
+            |lc| lc,
+        );
+        Ok(())
+    }
+
     /// Compute the natural number represented by an array of limbs.
     /// The limbs are assumed to be based the `limb_width` power of 2.
     /// Low-index bits are low-order
@@ -141,11 +167,16 @@ impl<Scalar: PrimeField> Num<Scalar> {
         let bits: Vec<LinearCombination<Scalar>> = std::iter::once(bit0_lc)
             .chain(
                 allocations
+                    .clone()
                     .into_iter()
                     .map(|a| LinearCombination::zero() + &a.bit),
             )
             .collect();
-        Ok(Bitvector { values, bits })
+        Ok(Bitvector {
+            allocations,
+            values,
+            bits,
+        })
     }
 
     pub fn as_sapling_allocated_num<CS: ConstraintSystem<Scalar>>(

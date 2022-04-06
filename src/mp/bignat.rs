@@ -257,13 +257,13 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
     /// The `max_word` is gauranteed to be `(2 << limb_width) - 1`.
     /// The value is provided by an allocated number
     pub fn from_num<CS: ConstraintSystem<Scalar>>(
-        cs: CS,
+        mut cs: CS,
         n: Num<Scalar>,
         limb_width: usize,
         n_limbs: usize,
     ) -> Result<Self, SynthesisError> {
-        Self::alloc_from_nat(
-            cs,
+        let bignat = Self::alloc_from_nat(
+            cs.namespace(|| "bignat"),
             || {
                 Ok({
                     n.value
@@ -274,7 +274,15 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
             },
             limb_width,
             n_limbs,
-        )
+        )?;
+
+        // check if bignat equals n
+        // (1) decompose `bignat` into a bitvector `bv`
+        let bv = bignat.decompose(cs.namespace(|| "bv"))?;
+        // (2) recompose bits and check if it equals n
+        n.is_equal(cs.namespace(|| "n"), &bv)?;
+
+        Ok(bignat)
     }
 
     // pub fn from_num(n: Num<Scalar>, params: BigNatParams) -> Self {
@@ -521,12 +529,18 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
             .collect::<Result<Vec<_>, _>>()?;
         let mut bits = Vec::new();
         let mut values = Vec::new();
+        let mut allocations = Vec::new();
         for bv in bitvectors {
             bits.extend(bv.bits);
             bv.values.map(|vs| values.extend(vs));
+            allocations.extend(bv.allocations);
         }
         let values = if values.len() > 0 { Some(values) } else { None };
-        Ok(Bitvector { bits, values })
+        Ok(Bitvector {
+            bits,
+            values,
+            allocations,
+        })
     }
 
     pub fn recompose(bv: &Bitvector<Scalar>, limb_width: usize) -> Self {
@@ -1343,9 +1357,9 @@ impl<Scalar: PrimeField> Gadget for BigNat<Scalar> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use util::test_helpers::*;
     use quickcheck::TestResult;
     use util::convert::usize_to_f;
+    use util::test_helpers::*;
 
     pub struct CarrierInputs {
         pub a: Vec<usize>,

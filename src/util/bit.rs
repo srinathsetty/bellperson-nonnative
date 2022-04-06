@@ -23,6 +23,8 @@ pub struct Bitvector<Scalar: PrimeField> {
     pub bits: Vec<LinearCombination<Scalar>>,
     /// The value of the bits (filled at witness-time)
     pub values: Option<Vec<bool>>,
+    /// Allocated bit variables
+    pub allocations: Vec<Bit<Scalar>>,
 }
 
 impl<Scalar: PrimeField> Bitvector<Scalar> {
@@ -61,12 +63,6 @@ impl<Scalar: PrimeField> Bitvector<Scalar> {
         self.bits
             .splice(0..0, std::iter::repeat(LinearCombination::zero()).take(i));
         self
-    }
-
-    pub fn split_off(&mut self, n_bits: usize) -> Bitvector<Scalar> {
-        let bits = self.bits.split_off(n_bits);
-        let values = self.values.as_mut().map(|vs| vs.split_off(n_bits));
-        Bitvector { bits, values }
     }
 
     pub fn pop(&mut self) -> Option<Bit<Scalar>> {
@@ -117,7 +113,7 @@ impl<Scalar: PrimeField> Bitvector<Scalar> {
     pub fn from_bits(bs: Vec<Bit<Scalar>>) -> Self {
         let mut bits = Vec::new();
         let mut values = Some(Vec::new());
-        for mut b in bs {
+        for mut b in bs.clone() {
             let v = b.value.take();
             bits.push(b.bit);
             values = values.take().and_then(|mut vs| {
@@ -127,7 +123,11 @@ impl<Scalar: PrimeField> Bitvector<Scalar> {
                 })
             });
         }
-        Self { bits, values }
+        Self {
+            bits,
+            values,
+            allocations: bs,
+        }
     }
 }
 

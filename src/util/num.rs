@@ -115,7 +115,7 @@ impl<Scalar: PrimeField> Num<Scalar> {
                 f = f.double();
                 l
             });
-        let sum_lc = LinearCombination::zero() + &self.num - &sum_of_tail_bits;
+        let sum_lc = LinearCombination::zero() + &self.num - &sum;
         cs.enforce(|| "sum", |lc| lc + &sum_lc, |lc| lc + CS::one(), |lc| lc);
         Ok(())
     }
@@ -146,14 +146,14 @@ impl<Scalar: PrimeField> Num<Scalar> {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let mut f = Scalar::one();
-        let sum_of_tail_bits = allocations
+        let sum = allocations
             .iter()
             .fold(LinearCombination::zero(), |lc, bit| {
                 let l = lc + (f, &bit.bit);
                 f = f.double();
                 l
             });
-        let sum_lc = LinearCombination::zero() + &self.num - &sum_of_tail_bits;
+        let sum_lc = LinearCombination::zero() + &self.num - &sum;
         cs.enforce(|| "sum", |lc| lc + &sum_lc, |lc| lc + CS::one(), |lc| lc);
         let bits: Vec<LinearCombination<Scalar>> = allocations
             .clone()

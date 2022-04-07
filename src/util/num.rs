@@ -107,21 +107,18 @@ impl<Scalar: PrimeField> Num<Scalar> {
         other: &Bitvector<Scalar>,
     ) -> Result<(), SynthesisError> {
         let allocations = other.allocations.clone();
-
+        println!("length of allocations: {}", allocations.len());
         let mut f = Scalar::one();
         let sum_of_tail_bits = allocations
             .iter()
             .fold(LinearCombination::zero(), |lc, bit| {
+                let l = lc + (f, &bit.bit);
                 f = f.double();
-                lc + (f, &bit.bit)
+                l
             });
+        println!("Sum of tail bits: {:?}", sum_of_tail_bits);
         let bit0_lc = LinearCombination::zero() + &self.num - &sum_of_tail_bits;
-        cs.enforce(
-            || "sum",
-            |lc| lc + &bit0_lc,
-            |lc| lc + CS::one() - &bit0_lc,
-            |lc| lc,
-        );
+        cs.enforce(|| "sum", |lc| lc + &bit0_lc, |lc| lc + CS::one(), |lc| lc);
         Ok(())
     }
 
@@ -142,7 +139,8 @@ impl<Scalar: PrimeField> Num<Scalar> {
                 })
                 .collect()
         });
-        let allocations: Vec<Bit<Scalar>> = (1..n_bits)
+        println!("values: {:?}", values);
+        let allocations: Vec<Bit<Scalar>> = (0..n_bits)
             .map(|bit_i| {
                 Bit::alloc(
                     cs.namespace(|| format!("bit{}", bit_i)),
@@ -150,27 +148,21 @@ impl<Scalar: PrimeField> Num<Scalar> {
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
+        println!("allocations.len(): {:?}", allocations.len());
         let mut f = Scalar::one();
         let sum_of_tail_bits = allocations
             .iter()
             .fold(LinearCombination::zero(), |lc, bit| {
+                let l = lc + (f, &bit.bit);
                 f = f.double();
-                lc + (f, &bit.bit)
+                l
             });
         let bit0_lc = LinearCombination::zero() + &self.num - &sum_of_tail_bits;
-        cs.enforce(
-            || "sum",
-            |lc| lc + &bit0_lc,
-            |lc| lc + CS::one() - &bit0_lc,
-            |lc| lc,
-        );
-        let bits: Vec<LinearCombination<Scalar>> = std::iter::once(bit0_lc)
-            .chain(
-                allocations
-                    .clone()
-                    .into_iter()
-                    .map(|a| LinearCombination::zero() + &a.bit),
-            )
+        cs.enforce(|| "sum", |lc| lc + &bit0_lc, |lc| lc + CS::one(), |lc| lc);
+        let bits: Vec<LinearCombination<Scalar>> = allocations
+            .clone()
+            .into_iter()
+            .map(|a| LinearCombination::zero() + &a.bit)
             .collect();
         Ok(Bitvector {
             allocations,

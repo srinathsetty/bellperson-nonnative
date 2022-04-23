@@ -9,9 +9,13 @@ keywords = ["zkSNARKs", "cryptography", "proofs"]
 [dependencies]
 rand = "0.4"
 rug = { version = "1.10", default-features = false, features = ["integer", "serde", "rand"] }
-bellperson = "0.19.1"
-ff = {version = "0.11", features = ["derive"]}
+bellperson = { version = "0.20", default-features = false, optional = true }
+ff = { version = "0.11", features = ["derive"] }
 byteorder = "0.3.0"
+
+[features]
+default = ["bellperson/default"]
+wasm = ["bellperson/wasm"]
 
 [dev-dependencies]
 quickcheck = "0.8"

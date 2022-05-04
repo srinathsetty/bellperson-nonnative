@@ -5,7 +5,7 @@ use ff::PrimeField;
 
 use std::fmt::{self, Display, Formatter};
 
-use OptionExt;
+use crate::OptionExt;
 
 #[derive(Clone)]
 /// A representation of a bit

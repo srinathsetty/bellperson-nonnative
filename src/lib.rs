@@ -1,14 +1,8 @@
-extern crate bellperson;
-extern crate ff;
-extern crate rand;
-extern crate rug;
-
 #[cfg(test)]
 extern crate quickcheck;
 #[cfg(test)]
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
-extern crate byteorder;
 
 #[macro_use]
 pub mod util;

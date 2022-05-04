@@ -3,9 +3,9 @@ use bellperson::{ConstraintSystem, LinearCombination, SynthesisError, Variable};
 use ff::PrimeField;
 
 use super::bit::{Bit, Bitvector};
+use crate::BitAccess;
+use crate::OptionExt;
 use std::convert::From;
-use BitAccess;
-use OptionExt;
 
 pub struct Num<Scalar: PrimeField> {
     pub num: LinearCombination<Scalar>,

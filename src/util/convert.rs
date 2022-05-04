@@ -1,6 +1,6 @@
 use byteorder::WriteBytesExt;
 use ff::PrimeField;
-use rug::{integer::Order, Integer};
+use num_bigint::{BigInt, Sign};
 use std::io::{self, Write};
 
 fn write_be<F: PrimeField, W: Write>(f: &F, mut writer: W) -> io::Result<()> {
@@ -12,15 +12,15 @@ fn write_be<F: PrimeField, W: Write>(f: &F, mut writer: W) -> io::Result<()> {
 }
 
 /// Convert a field element to a natural number
-pub fn f_to_nat<Scalar: PrimeField>(f: &Scalar) -> Integer {
+pub fn f_to_nat<Scalar: PrimeField>(f: &Scalar) -> BigInt {
     let mut s = Vec::new();
     write_be(f, &mut s).unwrap(); // f.to_repr().write_be(&mut s).unwrap();
-    Integer::from_digits(f.to_repr().as_ref(), Order::Lsf)
+    BigInt::from_bytes_le(Sign::Plus, f.to_repr().as_ref())
 }
 
 /// Convert a natural number to a field element.
 /// Returns `None` if the number is too big for the field.
-pub fn nat_to_f<Scalar: PrimeField>(n: &Integer) -> Option<Scalar> {
+pub fn nat_to_f<Scalar: PrimeField>(n: &BigInt) -> Option<Scalar> {
     Scalar::from_str_vartime(&format!("{}", n))
 }
 
@@ -47,14 +47,14 @@ mod test {
 
     #[test]
     fn test_nat_to_f() {
-        let n = Integer::from(4usize);
+        let n = BigInt::from(4usize);
         let e = Fr::from_str_vartime("4").unwrap();
         assert!(nat_to_f::<Fr>(&n).unwrap() == e);
     }
 
     #[test]
     fn test_f_to_nat() {
-        let n = Integer::from(4usize);
+        let n = BigInt::from(4usize);
         let e = Fr::from_str_vartime("4").unwrap();
         assert!(f_to_nat(&e) == n)
     }

@@ -3,7 +3,7 @@ use bellperson::{ConstraintSystem, LinearCombination, SynthesisError};
 use ff::PrimeField;
 
 use super::bit::Bit;
-use OptionExt;
+use crate::OptionExt;
 
 pub trait Gadget: Sized + Clone {
     type Scalar: PrimeField;

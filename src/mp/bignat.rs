@@ -3,7 +3,9 @@ use bellperson::gadgets::boolean::Boolean;
 use bellperson::gadgets::num::AllocatedNum;
 use bellperson::{ConstraintSystem, LinearCombination, SynthesisError};
 use ff::PrimeField;
-use rug::Integer;
+use num_bigint::BigInt;
+use num_integer::Integer;
+use num_traits::cast::ToPrimitive;
 
 use std::borrow::Borrow;
 use std::cmp::{max, min, Ordering};
@@ -12,28 +14,28 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::rc::Rc;
 
 use super::poly::Polynomial;
-use util::bit::{Bit, Bitvector};
-use util::convert::{f_to_nat, nat_to_f};
-use util::gadget::Gadget;
-use util::lazy::LazyCell;
-use util::num::Num;
-use OptionExt;
+use crate::util::bit::{Bit, Bitvector};
+use crate::util::convert::{f_to_nat, nat_to_f};
+use crate::util::gadget::Gadget;
+use crate::util::lazy::LazyCell;
+use crate::util::num::Num;
+use crate::OptionExt;
 
 /// Compute the natural number represented by an array of limbs.
 /// The limbs are assumed to be based the `limb_width` power of 2.
 pub fn limbs_to_nat<Scalar: PrimeField, B: Borrow<Scalar>, I: DoubleEndedIterator<Item = B>>(
     limbs: I,
     limb_width: usize,
-) -> Integer {
-    limbs.rev().fold(Integer::from(0), |mut acc, limb| {
+) -> BigInt {
+    limbs.rev().fold(BigInt::from(0), |mut acc, limb| {
         acc <<= limb_width as u32;
         acc += f_to_nat(limb.borrow());
         acc
     })
 }
 
-fn int_with_n_ones(n: usize) -> Integer {
-    let mut m = Integer::from(1);
+fn int_with_n_ones(n: usize) -> BigInt {
+    let mut m = BigInt::from(1);
     m <<= n as u32;
     m -= 1;
     m
@@ -42,16 +44,16 @@ fn int_with_n_ones(n: usize) -> Integer {
 /// Compute the limbs encoding a natural number.
 /// The limbs are assumed to be based the `limb_width` power of 2.
 pub fn nat_to_limbs<'a, Scalar: PrimeField>(
-    nat: &Integer,
+    nat: &BigInt,
     limb_width: usize,
     n_limbs: usize,
 ) -> Result<Vec<Scalar>, SynthesisError> {
     let mask = int_with_n_ones(limb_width);
     let mut nat = nat.clone();
-    if nat.significant_bits() as usize <= n_limbs * limb_width {
+    if nat.bits() as usize <= n_limbs * limb_width {
         Ok((0..n_limbs)
             .map(|_| {
-                let r = Integer::from(&nat & &mask);
+                let r = BigInt::from(&nat & &mask);
                 nat >>= limb_width as u32;
                 nat_to_f(&r).unwrap()
             })
@@ -68,14 +70,14 @@ pub fn nat_to_limbs<'a, Scalar: PrimeField>(
 #[derive(Clone, PartialEq, Eq)]
 pub struct BigNatParams {
     pub min_bits: usize,
-    pub max_word: Integer,
+    pub max_word: BigInt,
     pub limb_width: usize,
     pub n_limbs: usize,
 }
 
 impl BigNatParams {
     pub fn new(limb_width: usize, n_limbs: usize) -> Self {
-        let mut max_word = Integer::from(1) << limb_width as u32;
+        let mut max_word = BigInt::from(1) << limb_width as u32;
         max_word -= 1;
         BigNatParams {
             max_word,
@@ -94,7 +96,7 @@ pub struct BigNat<Scalar: PrimeField> {
     /// The witness values for each limb (filled at witness-time)
     pub limb_values: Option<Vec<Scalar>>,
     /// The value of the whole number (filled at witness-time)
-    pub value: Option<Integer>,
+    pub value: Option<BigInt>,
     /// Parameters
     pub params: BigNatParams,
 }
@@ -122,7 +124,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
     pub fn alloc_from_limbs<CS, F>(
         mut cs: CS,
         f: F,
-        max_word: Option<Integer>,
+        max_word: Option<BigInt>,
         limb_width: usize,
         n_limbs: usize,
     ) -> Result<Self, SynthesisError>
@@ -211,7 +213,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
     ) -> Result<Self, SynthesisError>
     where
         CS: ConstraintSystem<Scalar>,
-        F: FnOnce() -> Result<Integer, SynthesisError>,
+        F: FnOnce() -> Result<BigInt, SynthesisError>,
     {
         let all_values_cell = LazyCell::new(|| {
             f().and_then(|v| Ok((nat_to_limbs::<Scalar>(&v, limb_width, n_limbs)?, v)))
@@ -688,7 +690,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         new
     }
 
-    pub fn from_poly(poly: Polynomial<Scalar>, limb_width: usize, max_word: Integer) -> Self {
+    pub fn from_poly(poly: Polynomial<Scalar>, limb_width: usize, max_word: BigInt) -> Self {
         Self {
             params: BigNatParams {
                 min_bits: 0,
@@ -715,11 +717,12 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
 
         // We'll propegate carries over the first `n` limbs.
         let n = min(self.limbs.len(), other.limbs.len());
-        let target_base = Integer::from(1) << self.params.limb_width as u32;
-        let mut accumulated_extra = Integer::from(0usize);
+        let target_base = BigInt::from(1u8) << self.params.limb_width as u32;
+        let mut accumulated_extra = BigInt::from(0usize);
         let max_word = std::cmp::max(&self.params.max_word, &other.params.max_word);
-        let carry_bits = (((max_word.to_f64() * 2.0).log2() - self.params.limb_width as f64).ceil()
-            + 0.1) as usize;
+        let carry_bits =
+            (((max_word.to_f64().unwrap() * 2.0).log2() - self.params.limb_width as f64).ceil()
+                + 0.1) as usize;
         let mut carry_in = Num::new(Some(Scalar::zero()), LinearCombination::zero());
 
         for i in 0..n {
@@ -744,7 +747,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
                         + (nat_to_f(&max_word).unwrap(), CS::one())
                         - (nat_to_f(&target_base).unwrap(), &carry.num)
                         - (
-                            nat_to_f(&Integer::from(&accumulated_extra % &target_base)).unwrap(),
+                            nat_to_f(&BigInt::from(&accumulated_extra % &target_base)).unwrap(),
                             CS::one(),
                         )
                 },
@@ -794,8 +797,9 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
     ) -> Result<(), SynthesisError> {
         self.enforce_limb_width_agreement(other, "equal_when_carried_regroup")?;
         let max_word = std::cmp::max(&self.params.max_word, &other.params.max_word);
-        let carry_bits = (((max_word.to_f64() * 2.0).log2() - self.params.limb_width as f64).ceil()
-            + 0.1) as usize;
+        let carry_bits =
+            (((max_word.to_f64().unwrap() * 2.0).log2() - self.params.limb_width as f64).ceil()
+                + 0.1) as usize;
         let limbs_per_group = (Scalar::CAPACITY as usize - carry_bits) / self.params.limb_width;
         let self_grouped = self.group_limbs(limbs_per_group);
         let other_grouped = other.group_limbs(limbs_per_group);
@@ -814,8 +818,8 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
             || {
                 let s = self.value.grab()?;
                 let o = other.value.grab()?;
-                if o.is_divisible(s) {
-                    Ok(Integer::from(o / s))
+                if o.is_multiple_of(&s) {
+                    Ok(BigInt::from(o / s))
                 } else {
                     eprintln!("Not divisible");
                     Err(SynthesisError::Unsatisfiable)
@@ -842,7 +846,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
             *v += f_to_nat(&constant);
         }
         new.params.max_word += f_to_nat(&constant);
-        assert!(new.params.max_word <= (Integer::from(1) << Scalar::CAPACITY));
+        assert!(new.params.max_word <= (BigInt::from(1) << Scalar::CAPACITY));
         new
     }
 
@@ -860,7 +864,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
             *v *= f_to_nat(&constant);
         }
         new.params.max_word *= f_to_nat(&constant);
-        assert!(new.params.max_word <= (Integer::from(1) << Scalar::CAPACITY));
+        assert!(new.params.max_word <= (BigInt::from(1) << Scalar::CAPACITY));
         new
     }
 
@@ -918,7 +922,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
     ) -> Result<BigNat<Scalar>, SynthesisError> {
         self.enforce_limb_width_agreement(other, "add")?;
         let n_limbs = max(self.params.n_limbs, other.params.n_limbs);
-        let max_word = Integer::from(&self.params.max_word + &other.params.max_word);
+        let max_word = BigInt::from(&self.params.max_word + &other.params.max_word);
         let limbs: Vec<LinearCombination<Scalar>> = (0..n_limbs)
             .map(|i| match (self.limbs.get(i), other.limbs.get(i)) {
                 (Some(a), Some(b)) => a.clone() + b,
@@ -946,7 +950,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         let value = self
             .value
             .as_ref()
-            .and_then(|x| other.value.as_ref().map(|y| Integer::from(x + y)));
+            .and_then(|x| other.value.as_ref().map(|y| BigInt::from(x + y)));
         Ok(Self {
             limb_values,
             value,
@@ -986,7 +990,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         self.enforce_limb_width_agreement(prod, "verify_mult, prod")?;
         // Verify that factor is in bounds
         let max_word = {
-            let mut x = Integer::from(min(self.params.n_limbs, other.params.n_limbs));
+            let mut x = BigInt::from(min(self.params.n_limbs, other.params.n_limbs));
             x *= &self.params.max_word;
             x *= &other.params.max_word;
             x
@@ -1016,7 +1020,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
             cs.namespace(|| "quotient"),
             || {
                 Ok({
-                    let mut x: Integer = self.value.grab()?.clone();
+                    let mut x: BigInt = self.value.grab()?.clone();
                     x *= *other.value().grab()?;
                     x /= *modulus.value().grab()?;
                     x
@@ -1039,13 +1043,13 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         let right = Polynomial::from(right_product).sum(&r_poly);
 
         let left_max_word = {
-            let mut x = Integer::from(min(self.limbs.len(), other.limbs.len()));
+            let mut x = BigInt::from(min(self.limbs.len(), other.limbs.len()));
             x *= &self.params.max_word;
             x *= &other.params.max_word;
             x
         };
         let right_max_word = {
-            let mut x = Integer::from(std::cmp::min(quotient.limbs.len(), modulus.limbs.len()));
+            let mut x = BigInt::from(std::cmp::min(quotient.limbs.len(), modulus.limbs.len()));
             x *= &quotient.params.max_word;
             x *= &modulus.params.max_word;
             x += &remainder.params.max_word;
@@ -1111,13 +1115,13 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         let right = Polynomial::from(right_product).sum(&r_poly);
 
         let left_max_word = {
-            let mut x = Integer::from(min(self.limbs.len(), other.limbs.len()));
+            let mut x = BigInt::from(min(self.limbs.len(), other.limbs.len()));
             x *= &self.params.max_word;
             x *= &other.params.max_word;
             x
         };
         let right_max_word = {
-            let mut x = Integer::from(std::cmp::min(quotient.limbs.len(), modulus.limbs.len()));
+            let mut x = BigInt::from(std::cmp::min(quotient.limbs.len(), modulus.limbs.len()));
             x *= &quotient.params.max_word;
             x *= &modulus.params.max_word;
             x += &remainder.params.max_word;
@@ -1142,14 +1146,14 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         let quotient_limbs = quotient_bits.saturating_sub(1) / limb_width + 1;
         let quotient = BigNat::alloc_from_nat(
             cs.namespace(|| "quotient"),
-            || Ok(Integer::from(self.value.grab()? / modulus.value.grab()?)),
+            || Ok(BigInt::from(self.value.grab()? / modulus.value.grab()?)),
             self.params.limb_width,
             quotient_limbs,
         )?;
         quotient.assert_well_formed(cs.namespace(|| "quotient rangecheck"))?;
         let remainder = BigNat::alloc_from_nat(
             cs.namespace(|| "remainder"),
-            || Ok(Integer::from(self.value.grab()? % modulus.value.grab()?)),
+            || Ok(BigInt::from(self.value.grab()? % modulus.value.grab()?)),
             self.params.limb_width,
             modulus.limbs.len(),
         )?;
@@ -1163,7 +1167,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         let right = Polynomial::from(right_product).sum(&r_poly);
 
         let right_max_word = {
-            let mut x = Integer::from(std::cmp::min(quotient.limbs.len(), modulus.limbs.len()));
+            let mut x = BigInt::from(std::cmp::min(quotient.limbs.len(), modulus.limbs.len()));
             x *= &quotient.params.max_word;
             x *= &modulus.params.max_word;
             x += &remainder.params.max_word;
@@ -1216,8 +1220,8 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
             }
             limbs
         };
-        let max_word = (0..limbs_per_group).fold(Integer::from(0), |mut acc, i| {
-            acc.set_bit((i * self.params.limb_width) as u32, true);
+        let max_word = (0..limbs_per_group).fold(BigInt::from(0u8), |mut acc, i| {
+            acc.set_bit((i * self.params.limb_width) as u64, true);
             acc
         }) * &self.params.max_word;
         BigNat {
@@ -1256,27 +1260,26 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
     pub fn one<CS: ConstraintSystem<Scalar>>(limb_width: usize) -> Self {
         BigNat {
             limb_values: Some(vec![Scalar::one()]),
-            value: Some(Integer::from(1)),
+            value: Some(BigInt::from(1)),
             limbs: { vec![LinearCombination::zero() + CS::one()] },
             params: BigNatParams {
                 min_bits: 1,
                 n_limbs: 1,
                 limb_width: limb_width,
-                max_word: Integer::from(1),
+                max_word: BigInt::from(1),
             },
         }
     }
 
     pub fn n_bits(&self) -> usize {
         assert!(self.params.n_limbs > 0);
-        self.params.limb_width * (self.params.n_limbs - 1)
-            + self.params.max_word.significant_bits() as usize
+        self.params.limb_width * (self.params.n_limbs - 1) + self.params.max_word.bits() as usize
     }
 }
 
 impl<Scalar: PrimeField> Gadget for BigNat<Scalar> {
     type Scalar = Scalar;
-    type Value = Integer;
+    type Value = BigInt;
     type Params = BigNatParams;
     type Access = ();
     fn alloc<CS: ConstraintSystem<Scalar>>(
@@ -1292,7 +1295,7 @@ impl<Scalar: PrimeField> Gadget for BigNat<Scalar> {
             params.n_limbs,
         )
     }
-    fn value(&self) -> Option<&Integer> {
+    fn value(&self) -> Option<&BigInt> {
         self.value.as_ref()
     }
     fn wire_values(&self) -> Option<Vec<Scalar>> {
@@ -1357,9 +1360,10 @@ impl<Scalar: PrimeField> Gadget for BigNat<Scalar> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::convert::usize_to_f;
+    use crate::util::test_helpers::*;
+    use num_traits::Num as BigNum;
     use quickcheck::TestResult;
-    use util::convert::usize_to_f;
-    use util::test_helpers::*;
 
     pub struct CarrierInputs {
         pub a: Vec<usize>,
@@ -1478,7 +1482,7 @@ mod tests {
                         .map(usize_to_f)
                         .collect())
                 },
-                Some(Integer::from(self.params.max_word)),
+                Some(BigInt::from(self.params.max_word)),
                 self.params.limb_width,
                 self.params.n_limbs,
             )?;
@@ -1496,7 +1500,7 @@ mod tests {
                         .map(usize_to_f)
                         .collect())
                 },
-                Some(Integer::from(self.params.max_word)),
+                Some(BigInt::from(self.params.max_word)),
                 self.params.limb_width,
                 self.params.n_limbs,
             )?;
@@ -1508,11 +1512,11 @@ mod tests {
 
     #[derive(Debug)]
     pub struct MultModInputs {
-        pub a: Integer,
-        pub b: Integer,
-        pub m: Integer,
-        pub q: Integer,
-        pub r: Integer,
+        pub a: BigInt,
+        pub b: BigInt,
+        pub m: BigInt,
+        pub q: BigInt,
+        pub r: BigInt,
     }
 
     pub struct MultModParameters {
@@ -1583,11 +1587,11 @@ mod tests {
                 full_m: true,
             },
             inputs: Some(MultModInputs {
-                a: Integer::from(1usize),
-                b: Integer::from(1usize),
-                m: Integer::from(255usize),
-                q: Integer::from(0usize),
-                r: Integer::from(1usize),
+                a: BigInt::from(1usize),
+                b: BigInt::from(1usize),
+                m: BigInt::from(255usize),
+                q: BigInt::from(0usize),
+                r: BigInt::from(1usize),
             }),
         }, true),
         mult_mod_1_by_0: ( MultMod {
@@ -1599,11 +1603,11 @@ mod tests {
                 full_m: true,
             },
             inputs: Some(MultModInputs {
-                a: Integer::from(1usize),
-                b: Integer::from(0usize),
-                m: Integer::from(255usize),
-                q: Integer::from(0usize),
-                r: Integer::from(0usize),
+                a: BigInt::from(1usize),
+                b: BigInt::from(0usize),
+                m: BigInt::from(255usize),
+                q: BigInt::from(0usize),
+                r: BigInt::from(0usize),
             }),
         }, true),
         mult_mod_2_by_2: ( MultMod {
@@ -1615,11 +1619,11 @@ mod tests {
                 full_m: true,
             },
             inputs: Some(MultModInputs {
-                a: Integer::from(2usize),
-                b: Integer::from(2usize),
-                m: Integer::from(255usize),
-                q: Integer::from(0usize),
-                r: Integer::from(4usize),
+                a: BigInt::from(2usize),
+                b: BigInt::from(2usize),
+                m: BigInt::from(255usize),
+                q: BigInt::from(0usize),
+                r: BigInt::from(4usize),
             }),
         }, true),
         mult_mod_16_by_16: ( MultMod {
@@ -1631,11 +1635,11 @@ mod tests {
                 full_m: true,
             },
             inputs: Some(MultModInputs {
-                a: Integer::from(16usize),
-                b: Integer::from(16usize),
-                m: Integer::from(255usize),
-                q: Integer::from(1usize),
-                r: Integer::from(1usize),
+                a: BigInt::from(16usize),
+                b: BigInt::from(16usize),
+                m: BigInt::from(255usize),
+                q: BigInt::from(1usize),
+                r: BigInt::from(1usize),
             }),
         }, true),
         mult_mod_254_by_254: ( MultMod {
@@ -1647,11 +1651,11 @@ mod tests {
                 full_m: true,
             },
             inputs: Some(MultModInputs {
-                a: Integer::from(254usize),
-                b: Integer::from(254usize),
-                m: Integer::from(255usize),
-                q: Integer::from(253usize),
-                r: Integer::from(1usize),
+                a: BigInt::from(254usize),
+                b: BigInt::from(254usize),
+                m: BigInt::from(255usize),
+                q: BigInt::from(253usize),
+                r: BigInt::from(1usize),
             }),
         }, true),
         mult_mod_254_by_254_wrong: ( MultMod {
@@ -1663,11 +1667,11 @@ mod tests {
                 full_m: true,
             },
             inputs: Some(MultModInputs {
-                a: Integer::from(254usize),
-                b: Integer::from(254usize),
-                m: Integer::from(255usize),
-                q: Integer::from(253usize),
-                r: Integer::from(0usize),
+                a: BigInt::from(254usize),
+                b: BigInt::from(254usize),
+                m: BigInt::from(255usize),
+                q: BigInt::from(253usize),
+                r: BigInt::from(0usize),
             }),
         }, false),
         mult_mod_110_by_180_mod187: ( MultMod {
@@ -1679,11 +1683,11 @@ mod tests {
                 full_m: true,
             },
             inputs: Some(MultModInputs {
-                a: Integer::from(110usize),
-                b: Integer::from(180usize),
-                m: Integer::from(187usize),
-                q: Integer::from(105usize),
-                r: Integer::from(165usize),
+                a: BigInt::from(110usize),
+                b: BigInt::from(180usize),
+                m: BigInt::from(187usize),
+                q: BigInt::from(105usize),
+                r: BigInt::from(165usize),
             }),
         }, true),
         mult_mod_2w_by_6w: ( MultMod {
@@ -1695,11 +1699,11 @@ mod tests {
                 full_m: true,
             },
             inputs: Some(MultModInputs {
-                a: Integer::from(16777215usize),
-                b: Integer::from(180usize),
-                m: Integer::from(255usize),
-                q: Integer::from(11842740usize),
-                r: Integer::from(0usize),
+                a: BigInt::from(16777215usize),
+                b: BigInt::from(180usize),
+                m: BigInt::from(255usize),
+                q: BigInt::from(11842740usize),
+                r: BigInt::from(0usize),
             }),
         }, true),
         mult_mod_2w_by_6w_test_2: ( MultMod {
@@ -1711,11 +1715,11 @@ mod tests {
                 full_m: true,
             },
             inputs: Some(MultModInputs {
-                a: Integer::from(16777210usize),
-                b: Integer::from(180usize),
-                m: Integer::from(255usize),
-                q: Integer::from(11842736usize),
-                r: Integer::from(120usize),
+                a: BigInt::from(16777210usize),
+                b: BigInt::from(180usize),
+                m: BigInt::from(255usize),
+                q: BigInt::from(11842736usize),
+                r: BigInt::from(120usize),
             }),
         }, true),
         mult_mod_2048x128: ( MultMod {
@@ -1727,11 +1731,11 @@ mod tests {
                 full_m: false,
             },
             inputs: Some(MultModInputs {
-                a: Integer::from(16777210usize),
-                b: Integer::from(180usize),
-                m: Integer::from(255usize),
-                q: Integer::from(11842736usize),
-                r: Integer::from(120usize),
+                a: BigInt::from(16777210usize),
+                b: BigInt::from(180usize),
+                m: BigInt::from(255usize),
+                q: BigInt::from(11842736usize),
+                r: BigInt::from(120usize),
             }),
         }, true),
         mult_mod_pallas: ( MultMod {
@@ -1743,18 +1747,18 @@ mod tests {
             full_m: false,
           },
           inputs: Some(MultModInputs {
-            a: Integer::from_str_radix("11572336752428856981970994795408771577024165681374400871001196932361466228192", 10).unwrap(),
-            b: Integer::from_str_radix("87673389408848523602668121701204553693362841135953267897017930941776218798802", 10).unwrap(),
-            m: Integer::from_str_radix("40000000000000000000000000000000224698fc094cf91b992d30ed00000001", 16).unwrap(),
-            q: Integer::from_str_radix("35048542371029440058224000662033175648615707461806414787901284501179083518342", 10).unwrap(),
-            r: Integer::from_str_radix("26362617993085418618858432307761590013874563896298265114483698919121453084730", 10).unwrap(),
+            a: BigInt::from_str_radix("11572336752428856981970994795408771577024165681374400871001196932361466228192", 10).unwrap(),
+            b: BigInt::from_str_radix("87673389408848523602668121701204553693362841135953267897017930941776218798802", 10).unwrap(),
+            m: BigInt::from_str_radix("40000000000000000000000000000000224698fc094cf91b992d30ed00000001", 16).unwrap(),
+            q: BigInt::from_str_radix("35048542371029440058224000662033175648615707461806414787901284501179083518342", 10).unwrap(),
+            r: BigInt::from_str_radix("26362617993085418618858432307761590013874563896298265114483698919121453084730", 10).unwrap(),
           })
         }, true),
     }
 
     #[derive(Debug)]
     pub struct NumberBitDecompInputs {
-        pub n: Integer,
+        pub n: BigInt,
     }
 
     pub struct NumberBitDecompParams {
@@ -1787,7 +1791,7 @@ mod tests {
                                       n_bits: 1,
                                   },
                                   inputs: Some(NumberBitDecompInputs {
-                                      n: Integer::from(1usize),
+                                      n: BigInt::from(1usize),
                                   }),
                               },
                               true
@@ -1798,7 +1802,7 @@ mod tests {
                                       n_bits: 2,
                                   },
                                   inputs: Some(NumberBitDecompInputs {
-                                      n: Integer::from(1usize),
+                                      n: BigInt::from(1usize),
                                   }),
                               },
                               true
@@ -1809,7 +1813,7 @@ mod tests {
                                       n_bits: 2,
                                   },
                                   inputs: Some(NumberBitDecompInputs {
-                                      n: Integer::from(5usize),
+                                      n: BigInt::from(5usize),
                                   }),
                               },
                               false
@@ -1820,7 +1824,7 @@ mod tests {
                                       n_bits: 8,
                                   },
                                   inputs: Some(NumberBitDecompInputs {
-                                      n: Integer::from(255usize),
+                                      n: BigInt::from(255usize),
                                   }),
                               },
                               true
@@ -1829,7 +1833,7 @@ mod tests {
 
     #[derive(Debug)]
     pub struct BigNatBitDecompInputs {
-        pub n: Integer,
+        pub n: BigInt,
     }
 
     pub struct BigNatBitDecompParams {
@@ -1872,9 +1876,7 @@ mod tests {
         };
 
         let circuit = BigNatBitDecomp {
-            inputs: Some(BigNatBitDecompInputs {
-                n: Integer::from(n),
-            }),
+            inputs: Some(BigNatBitDecompInputs { n: BigInt::from(n) }),
             params: BigNatBitDecompParams {
                 limb_width: limb_width as usize,
                 n_limbs,

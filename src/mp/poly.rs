@@ -4,7 +4,7 @@ use ff::PrimeField;
 use std::cmp::max;
 use std::fmt::{self, Debug, Formatter};
 
-use OptionExt;
+use crate::OptionExt;
 
 pub struct Polynomial<Scalar: PrimeField> {
     pub coefficients: Vec<LinearCombination<Scalar>>,

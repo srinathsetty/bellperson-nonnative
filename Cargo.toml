@@ -9,7 +9,6 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8"
-rug = { version = "1.10", default-features = false, features = ["integer", "serde", "rand"] }
 num-bigint = { version = "0.4", features = ["serde", "rand"] }
 num-traits = "0.2"
 num-integer = "0.1"

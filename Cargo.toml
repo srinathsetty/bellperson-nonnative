@@ -14,11 +14,11 @@ num-traits = "0.2"
 num-integer = "0.1"
 bellperson = { version = "0.24", default-features = false }
 ff = { version = "0.12", features = ["derive"] }
-byteorder = "1.4.3"
+byteorder = "0.3.0"
 
 [features]
 default = ["bellperson/default"]
 
 [dev-dependencies]
-quickcheck = "1.0.3"
-quickcheck_macros = "1.0.0"
+quickcheck = "0.8"
+quickcheck_macros = "0.8"

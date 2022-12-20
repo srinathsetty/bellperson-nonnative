@@ -8,7 +8,7 @@ keywords = ["zkSNARKs", "cryptography", "proofs"]
 edition = "2021"
 
 [dependencies]
-rand = "0.8"
+rand = { version = "0.8", default-features = false }
 num-bigint = { version = "0.4", features = ["serde", "rand"] }
 num-traits = "0.2"
 num-integer = "0.1"
@@ -17,7 +17,7 @@ ff = { version = "0.12", features = ["derive"] }
 byteorder = "0.3.0"
 
 [features]
-default = ["bellperson/default"]
+default = []
 
 [dev-dependencies]
 quickcheck = "0.8"

@@ -142,9 +142,9 @@ impl<Scalar: PrimeField> Bit<Scalar> {
             || "boolean",
             || {
                 if *value.grab()? {
-                    Ok(Scalar::one())
+                    Ok(Scalar::ONE)
                 } else {
-                    Ok(Scalar::zero())
+                    Ok(Scalar::ZERO)
                 }
             },
         )?;
@@ -187,7 +187,7 @@ impl<Scalar: PrimeField> Bit<Scalar> {
     }
 
     pub fn from_sapling<CS: ConstraintSystem<Scalar>>(b: Boolean) -> Self {
-        Self::new(b.lc(CS::one(), Scalar::one()), b.get_value())
+        Self::new(b.lc(CS::one(), Scalar::ONE), b.get_value())
     }
 
     pub fn not<CS: ConstraintSystem<Scalar>>(&self) -> Self {

@@ -22,8 +22,8 @@ impl<Scalar: PrimeField> Debug for Polynomial<Scalar> {
 impl<Scalar: PrimeField> Polynomial<Scalar> {
     pub fn evaluate_at(&self, x: Scalar) -> Option<Scalar> {
         self.values.as_ref().map(|vs| {
-            let mut v = Scalar::one();
-            let mut acc = Scalar::zero();
+            let mut v = Scalar::ONE;
+            let mut acc = Scalar::ZERO;
             for coeff in vs {
                 let mut t = coeff.clone();
                 t.mul_assign(&v);
@@ -41,7 +41,7 @@ impl<Scalar: PrimeField> Polynomial<Scalar> {
         let n_product_coeffs = self.coefficients.len() + other.coefficients.len() - 1;
         let values = self.values.as_ref().and_then(|self_vs| {
             other.values.as_ref().map(|other_vs| {
-                let mut values: Vec<Scalar> = std::iter::repeat_with(Scalar::zero)
+                let mut values: Vec<Scalar> = std::iter::repeat_with(|| Scalar::ZERO)
                     .take(n_product_coeffs)
                     .collect();
                 for (self_i, self_v) in self_vs.iter().enumerate() {
@@ -64,14 +64,14 @@ impl<Scalar: PrimeField> Polynomial<Scalar> {
             coefficients,
             values,
         };
-        let one = Scalar::one();
-        let mut x = Scalar::zero();
+        let one = Scalar::ONE;
+        let mut x = Scalar::ZERO;
         for _ in 1..(n_product_coeffs + 1) {
             x.add_assign(&one);
             cs.enforce(
                 || format!("pointwise product @ {:?}", x),
                 |lc| {
-                    let mut i = Scalar::one();
+                    let mut i = Scalar::ONE;
                     self.coefficients.iter().fold(lc, |lc, c| {
                         let r = lc + (i, c);
                         i.mul_assign(&x);
@@ -79,7 +79,7 @@ impl<Scalar: PrimeField> Polynomial<Scalar> {
                     })
                 },
                 |lc| {
-                    let mut i = Scalar::one();
+                    let mut i = Scalar::ONE;
                     other.coefficients.iter().fold(lc, |lc, c| {
                         let r = lc + (i, c);
                         i.mul_assign(&x);
@@ -87,7 +87,7 @@ impl<Scalar: PrimeField> Polynomial<Scalar> {
                     })
                 },
                 |lc| {
-                    let mut i = Scalar::one();
+                    let mut i = Scalar::ONE;
                     product.coefficients.iter().fold(lc, |lc, c| {
                         let r = lc + (i, c);
                         i.mul_assign(&x);
@@ -105,7 +105,7 @@ impl<Scalar: PrimeField> Polynomial<Scalar> {
             other.values.as_ref().map(|other_vs| {
                 (0..n_coeffs)
                     .map(|i| {
-                        let mut s = Scalar::zero();
+                        let mut s = Scalar::ZERO;
                         if i < self_vs.len() {
                             s.add_assign(&self_vs[i]);
                         }

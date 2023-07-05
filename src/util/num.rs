@@ -53,9 +53,9 @@ impl<Scalar: PrimeField> Num<Scalar> {
                     || format!("bit {}", i),
                     || {
                         let r = if *v.grab()?.get_bit(i).grab()? {
-                            Scalar::one()
+                            Scalar::ONE
                         } else {
-                            Scalar::zero()
+                            Scalar::ZERO
                         };
                         Ok(r)
                     },
@@ -76,7 +76,7 @@ impl<Scalar: PrimeField> Num<Scalar> {
         cs.enforce(
             || "last bit",
             |mut lc| {
-                let mut f = Scalar::one();
+                let mut f = Scalar::ONE;
                 lc = lc + &self.num;
                 for v in bits.iter() {
                     f = f.double();
@@ -86,7 +86,7 @@ impl<Scalar: PrimeField> Num<Scalar> {
             },
             |mut lc| {
                 lc = lc + CS::one();
-                let mut f = Scalar::one();
+                let mut f = Scalar::ONE;
                 lc = lc - &self.num;
                 for v in bits.iter() {
                     f = f.double();
@@ -107,7 +107,7 @@ impl<Scalar: PrimeField> Num<Scalar> {
         other: &Bitvector<Scalar>,
     ) -> Result<(), SynthesisError> {
         let allocations = other.allocations.clone();
-        let mut f = Scalar::one();
+        let mut f = Scalar::ONE;
         let sum = allocations
             .iter()
             .fold(LinearCombination::zero(), |lc, bit| {
@@ -145,7 +145,7 @@ impl<Scalar: PrimeField> Num<Scalar> {
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let mut f = Scalar::one();
+        let mut f = Scalar::ONE;
         let sum = allocations
             .iter()
             .fold(LinearCombination::zero(), |lc, bit| {

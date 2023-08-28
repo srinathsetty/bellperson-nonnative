@@ -1,4 +1,4 @@
-use bellperson::{ConstraintSystem, LinearCombination, SynthesisError};
+use bellpepper_core::{ConstraintSystem, LinearCombination, SynthesisError};
 use ff::PrimeField;
 
 use std::cmp::max;
@@ -141,8 +141,8 @@ mod tests {
     use super::*;
     use crate::util::convert::usize_to_f;
     use crate::util::scalar::Fr;
-    use bellperson::gadgets::test::TestConstraintSystem;
-    use bellperson::Circuit;
+    use bellpepper_core::test_cs::TestConstraintSystem;
+    use bellpepper_core::Circuit;
 
     pub struct PolynomialMultiplier<Scalar: PrimeField> {
         pub a: Vec<Scalar>,

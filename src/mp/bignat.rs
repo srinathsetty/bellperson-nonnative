@@ -1,7 +1,7 @@
-use bellperson::gadgets::boolean::AllocatedBit;
-use bellperson::gadgets::boolean::Boolean;
-use bellperson::gadgets::num::AllocatedNum;
-use bellperson::{ConstraintSystem, LinearCombination, SynthesisError};
+use bellpepper::gadgets::boolean::AllocatedBit;
+use bellpepper::gadgets::boolean::Boolean;
+use bellpepper::gadgets::num::AllocatedNum;
+use bellpepper_core::{ConstraintSystem, LinearCombination, SynthesisError};
 use ff::PrimeField;
 use num_bigint::BigInt;
 use num_integer::Integer;
@@ -11,6 +11,7 @@ use std::borrow::Borrow;
 use std::cmp::{max, min, Ordering};
 use std::convert::From;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::ops::Deref;
 use std::rc::Rc;
 
 use super::poly::Polynomial;
@@ -454,7 +455,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         mut cs: CS,
         other: &Self,
     ) -> Result<Boolean, SynthesisError> {
-        use bellperson::gadgets::num::Num;
+        use bellpepper::gadgets::num::Num;
         let mut rolling = Boolean::Constant(true);
         if self.limbs.len() != other.limbs.len() {
             eprintln!(
@@ -1290,7 +1291,7 @@ impl<Scalar: PrimeField> Gadget for BigNat<Scalar> {
     ) -> Result<Self, SynthesisError> {
         BigNat::alloc_from_nat(
             cs,
-            || Ok(value.grab()?.clone().clone()),
+            || Ok(value.grab()?.clone().deref().clone()),
             params.limb_width,
             params.n_limbs,
         )

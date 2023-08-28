@@ -1,6 +1,6 @@
 // (mostly from franklin-crypto)
-use bellperson::gadgets::boolean::Boolean;
-use bellperson::{ConstraintSystem, LinearCombination, SynthesisError};
+use bellpepper::gadgets::boolean::Boolean;
+use bellpepper_core::{ConstraintSystem, LinearCombination, SynthesisError};
 use ff::PrimeField;
 
 use std::fmt::{self, Display, Formatter};

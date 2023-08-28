@@ -8,7 +8,7 @@ extern crate quickcheck_macros;
 pub mod util;
 pub mod mp;
 
-use bellperson::SynthesisError;
+use bellpepper_core::SynthesisError;
 use ff::PrimeField;
 
 trait OptionExt<T> {

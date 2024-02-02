@@ -1283,6 +1283,8 @@ impl<Scalar: PrimeField> Gadget for BigNat<Scalar> {
     type Value = BigInt;
     type Params = BigNatParams;
     type Access = ();
+    
+    #[allow(noop_method_call)]
     fn alloc<CS: ConstraintSystem<Scalar>>(
         cs: CS,
         value: Option<&Self::Value>,

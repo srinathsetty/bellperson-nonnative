@@ -389,7 +389,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         let delta_inv = AllocatedNum::alloc(cs.namespace(|| "delta_inv"), || {
             let delta = delta.get_value().unwrap();
 
-            if delta.is_zero().unwrap_u8() == 0 {
+            if delta.is_zero().unwrap_u8() == 1 {
                 Ok(Scalar::ONE) // we can return any number here, it doesn't matter
             } else {
                 Ok(delta.invert().unwrap())
@@ -1364,6 +1364,7 @@ impl<Scalar: PrimeField> Gadget for BigNat<Scalar> {
 mod tests {
     use super::*;
     use crate::util::convert::usize_to_f;
+    use crate::util::scalar::Fr;
     use crate::util::test_helpers::*;
     use num_traits::Num as BigNum;
     use quickcheck::TestResult;
@@ -1888,6 +1889,26 @@ mod tests {
         let mut cs = TestConstraintSystem::<Fr>::new();
         circuit.synthesize(&mut cs).expect("synthesis failed");
         TestResult::from_bool(cs.is_satisfied())
+    }
+
+    #[test]
+    fn test_equals() {
+        let mut cs = TestConstraintSystem::<Fr>::new();
+
+        let a = AllocatedNum::alloc(cs.namespace(|| "a"), || Ok(Fr::from(3u64))).unwrap();
+        let b = AllocatedNum::alloc(cs.namespace(|| "b"), || Ok(Fr::from(4u64))).unwrap();
+        let c = AllocatedNum::alloc(cs.namespace(|| "c"), || Ok(Fr::from(4u64))).unwrap();
+        let r1 = BigNat::equals(cs.namespace(|| "check unequal"), &a, &b)
+            .unwrap()
+            .get_value()
+            .unwrap();
+        let r2 = BigNat::equals(cs.namespace(|| "check equal"), &b, &c)
+            .unwrap()
+            .get_value()
+            .unwrap();
+
+        assert!(!r1);
+        assert!(r2);
     }
 }
 

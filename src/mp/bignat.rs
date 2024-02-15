@@ -1,7 +1,7 @@
-use bellperson::gadgets::boolean::AllocatedBit;
-use bellperson::gadgets::boolean::Boolean;
-use bellperson::gadgets::num::AllocatedNum;
-use bellperson::{ConstraintSystem, LinearCombination, SynthesisError};
+use bellpepper::gadgets::boolean::AllocatedBit;
+use bellpepper::gadgets::boolean::Boolean;
+use bellpepper::gadgets::num::AllocatedNum;
+use bellpepper_core::{ConstraintSystem, LinearCombination, SynthesisError};
 use ff::PrimeField;
 use num_bigint::BigInt;
 use num_integer::Integer;
@@ -11,6 +11,7 @@ use std::borrow::Borrow;
 use std::cmp::{max, min, Ordering};
 use std::convert::From;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::ops::Deref;
 use std::rc::Rc;
 
 use super::poly::Polynomial;
@@ -388,8 +389,8 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         let delta_inv = AllocatedNum::alloc(cs.namespace(|| "delta_inv"), || {
             let delta = delta.get_value().unwrap();
 
-            if delta.is_zero().unwrap_u8() == 0 {
-                Ok(Scalar::one()) // we can return any number here, it doesn't matter
+            if delta.is_zero().unwrap_u8() == 1 {
+                Ok(Scalar::ONE) // we can return any number here, it doesn't matter
             } else {
                 Ok(delta.invert().unwrap())
             }
@@ -454,7 +455,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         mut cs: CS,
         other: &Self,
     ) -> Result<Boolean, SynthesisError> {
-        use bellperson::gadgets::num::Num;
+        use bellpepper::gadgets::num::Num;
         let mut rolling = Boolean::Constant(true);
         if self.limbs.len() != other.limbs.len() {
             eprintln!(
@@ -474,7 +475,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
                 || format!("equal self {}", i),
                 |lc| lc,
                 |lc| lc,
-                |lc| lc - &Num::from(self_limb.clone()).lc(Scalar::one()) + &self.limbs[i],
+                |lc| lc - &Num::from(self_limb.clone()).lc(Scalar::ONE) + &self.limbs[i],
             );
             let other_limb = AllocatedNum::alloc(cs.namespace(|| format!("other {}", i)), || {
                 Ok(other.limb_values.as_ref().grab()?[i])
@@ -483,7 +484,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
                 || format!("equal other {}", i),
                 |lc| lc,
                 |lc| lc,
-                |lc| lc - &Num::from(other_limb.clone()).lc(Scalar::one()) + &other.limbs[i],
+                |lc| lc - &Num::from(other_limb.clone()).lc(Scalar::ONE) + &other.limbs[i],
             );
 
             let b = Self::equals(
@@ -554,7 +555,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
                     let val =
                         bv.values
                             .as_ref()
-                            .map(|v| if v[i] { Scalar::one() } else { Scalar::zero() });
+                            .map(|v| if v[i] { Scalar::ONE } else { Scalar::ZERO });
                     Num::new(val, bit.clone())
                 })
                 .collect(),
@@ -593,10 +594,10 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
             || "inverse",
             || {
                 Ok({
-                    let mut sum = Scalar::zero();
+                    let mut sum = Scalar::ZERO;
                     for b in &upper_bits {
                         if *b.value.grab()? {
-                            sum.add_assign(&Scalar::one());
+                            sum.add_assign(&Scalar::ONE);
                         }
                     }
                     sum = sum.invert().unwrap();
@@ -723,7 +724,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         let carry_bits =
             (((max_word.to_f64().unwrap() * 2.0).log2() - self.params.limb_width as f64).ceil()
                 + 0.1) as usize;
-        let mut carry_in = Num::new(Some(Scalar::zero()), LinearCombination::zero());
+        let mut carry_in = Num::new(Some(Scalar::ZERO), LinearCombination::zero());
 
         for i in 0..n {
             let carry = Num::alloc(cs.namespace(|| format!("carry value {}", i)), || {
@@ -1183,15 +1184,15 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
     pub fn group_limbs(&self, limbs_per_group: usize) -> BigNat<Scalar> {
         let n_groups = (self.limbs.len() - 1) / limbs_per_group + 1;
         let limb_values = self.limb_values.as_ref().map(|vs| {
-            let mut values: Vec<Scalar> = vec![Scalar::zero(); n_groups];
-            let mut shift = Scalar::one();
-            let limb_block = (0..self.params.limb_width).fold(Scalar::one(), |mut l, _| {
+            let mut values: Vec<Scalar> = vec![Scalar::ZERO; n_groups];
+            let mut shift = Scalar::ONE;
+            let limb_block = (0..self.params.limb_width).fold(Scalar::ONE, |mut l, _| {
                 l = l.double();
                 l
             });
             for (i, v) in vs.iter().enumerate() {
                 if i % limbs_per_group == 0 {
-                    shift = Scalar::one();
+                    shift = Scalar::ONE;
                 }
                 let mut a = shift.clone();
                 // a.mul_assign(&v);
@@ -1204,14 +1205,14 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
         let limbs = {
             let mut limbs: Vec<LinearCombination<Scalar>> =
                 vec![LinearCombination::zero(); n_groups];
-            let mut shift = Scalar::one();
-            let limb_block = (0..self.params.limb_width).fold(Scalar::one(), |mut l, _| {
+            let mut shift = Scalar::ONE;
+            let limb_block = (0..self.params.limb_width).fold(Scalar::ONE, |mut l, _| {
                 l = l.double();
                 l
             });
             for (i, limb) in self.limbs.iter().enumerate() {
                 if i % limbs_per_group == 0 {
-                    shift = Scalar::one();
+                    shift = Scalar::ONE;
                 }
                 limbs[i / limbs_per_group] =
                     std::mem::replace(&mut limbs[i / limbs_per_group], LinearCombination::zero())
@@ -1246,7 +1247,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
                 new.params.n_limbs = n_limbs;
                 new.limb_values.as_mut().map(|vs| {
                     while vs.len() < n_limbs {
-                        vs.push(Scalar::zero())
+                        vs.push(Scalar::ZERO)
                     }
                 });
                 while new.limbs.len() < n_limbs {
@@ -1259,7 +1260,7 @@ impl<Scalar: PrimeField> BigNat<Scalar> {
 
     pub fn one<CS: ConstraintSystem<Scalar>>(limb_width: usize) -> Self {
         BigNat {
-            limb_values: Some(vec![Scalar::one()]),
+            limb_values: Some(vec![Scalar::ONE]),
             value: Some(BigInt::from(1)),
             limbs: { vec![LinearCombination::zero() + CS::one()] },
             params: BigNatParams {
@@ -1282,6 +1283,8 @@ impl<Scalar: PrimeField> Gadget for BigNat<Scalar> {
     type Value = BigInt;
     type Params = BigNatParams;
     type Access = ();
+    
+    #[allow(noop_method_call)]
     fn alloc<CS: ConstraintSystem<Scalar>>(
         cs: CS,
         value: Option<&Self::Value>,
@@ -1290,7 +1293,7 @@ impl<Scalar: PrimeField> Gadget for BigNat<Scalar> {
     ) -> Result<Self, SynthesisError> {
         BigNat::alloc_from_nat(
             cs,
-            || Ok(value.grab()?.clone().clone()),
+            || Ok(value.grab()?.clone().deref().clone()),
             params.limb_width,
             params.n_limbs,
         )
@@ -1361,6 +1364,7 @@ impl<Scalar: PrimeField> Gadget for BigNat<Scalar> {
 mod tests {
     use super::*;
     use crate::util::convert::usize_to_f;
+    use crate::util::scalar::Fr;
     use crate::util::test_helpers::*;
     use num_traits::Num as BigNum;
     use quickcheck::TestResult;
@@ -1885,6 +1889,26 @@ mod tests {
         let mut cs = TestConstraintSystem::<Fr>::new();
         circuit.synthesize(&mut cs).expect("synthesis failed");
         TestResult::from_bool(cs.is_satisfied())
+    }
+
+    #[test]
+    fn test_equals() {
+        let mut cs = TestConstraintSystem::<Fr>::new();
+
+        let a = AllocatedNum::alloc(cs.namespace(|| "a"), || Ok(Fr::from(3u64))).unwrap();
+        let b = AllocatedNum::alloc(cs.namespace(|| "b"), || Ok(Fr::from(4u64))).unwrap();
+        let c = AllocatedNum::alloc(cs.namespace(|| "c"), || Ok(Fr::from(4u64))).unwrap();
+        let r1 = BigNat::equals(cs.namespace(|| "check unequal"), &a, &b)
+            .unwrap()
+            .get_value()
+            .unwrap();
+        let r2 = BigNat::equals(cs.namespace(|| "check equal"), &b, &c)
+            .unwrap()
+            .get_value()
+            .unwrap();
+
+        assert!(!r1);
+        assert!(r2);
     }
 }
 

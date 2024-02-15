@@ -1,5 +1,5 @@
-use bellperson::gadgets::num::AllocatedNum;
-use bellperson::{ConstraintSystem, LinearCombination, SynthesisError};
+use bellpepper::gadgets::num::AllocatedNum;
+use bellpepper_core::{ConstraintSystem, LinearCombination, SynthesisError};
 use ff::PrimeField;
 
 use super::bit::Bit;

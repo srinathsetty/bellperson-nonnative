@@ -1,5 +1,5 @@
-pub use bellperson::gadgets::test::TestConstraintSystem;
-pub use bellperson::Circuit;
+pub use bellpepper_core::test_cs::TestConstraintSystem;
+pub use bellpepper_core::Circuit;
 pub use ff::PrimeField;
 
 macro_rules! circuit_tests {

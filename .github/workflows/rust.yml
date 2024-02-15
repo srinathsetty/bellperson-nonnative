@@ -1,4 +1,4 @@
-name: Build and Test bellperson-nonnative
+name: Build and Test bellpepper-nonnative
 
 on:
   push:
